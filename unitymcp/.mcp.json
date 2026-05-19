@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "unity-editor": {
+      "command": "uvx",
+      "args": ["unity-mcp-server"],
+      "env": {},
+      "_comment": "CoplayDev/unity-mcp Editor bridge. Unity Editor'da: Window > Unity MCP > Auto-configure"
+    },
+    "unity-docs": {
+      "command": "python",
+      "args": ["-m", "doc_search.server"],
+      "env": {
+        "UNITYMCP_KNOWLEDGE": "${CLAUDE_PLUGIN_ROOT}/../knowledge",
+        "UNITYMCP_INDEX": "${CLAUDE_PLUGIN_ROOT}/../.index/bm25.json",
+        "UNITYMCP_QDRANT": "http://localhost:6333",
+        "UNITYMCP_COLLECTION": "unity-knowledge",
+        "PYTHONPATH": "${CLAUDE_PLUGIN_ROOT}/../mcp-server"
+      },
+      "_comment": "Hybrid (BM25 + Vector) Unity knowledge search. Kurulum: pip install -e mcp-server/ ve docker compose up. Vector backend opsiyonel - UNITYMCP_QDRANT silersen BM25-only çalışır."
+    }
+  }
+}

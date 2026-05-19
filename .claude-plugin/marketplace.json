@@ -1,0 +1,22 @@
+{
+  "name": "unitymcp-marketplace",
+  "owner": {
+    "name": "GarroshCan",
+    "email": "umutcanguclu38@gmail.com"
+  },
+  "metadata": {
+    "description": "Full-stack Unity 6 (URP) plugin + knowledge base. Hem öğretmen hem coding partner."
+  },
+  "plugins": [
+    {
+      "name": "unitymcp",
+      "source": "./unitymcp",
+      "description": "Full-stack Unity 6 (URP) uzmanı — gameplay, editor tools, shaders, rendering, performance, UI, save sistemleri, workflow + self-extending knowledge base (Unity Manual, ScriptReference, paket docs, Steamworks, articles hybrid search).",
+      "version": "0.2.0",
+      "author": {
+        "name": "GarroshCan"
+      },
+      "keywords": ["unity", "unity6", "urp", "csharp", "gamedev", "knowledge-base", "rag"]
+    }
+  ]
+}

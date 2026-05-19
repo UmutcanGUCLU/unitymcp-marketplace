@@ -1,0 +1,33 @@
+# articles.txt — Curated Unity articles ingest list
+# Bu dosyayı `articles.txt` olarak kopyala ve kendi URL'lerinle doldur.
+# Sonra: python -m tools.ingest.articles --url-list articles.txt --out knowledge/articles
+#
+# Yorum satırları # ile başlar.
+# Boş satırlar atlanır.
+
+# ===== Unity Blog =====
+https://blog.unity.com/engine-platform/unity-6-overview-rendering-features
+https://blog.unity.com/games/optimization-tips-for-mobile-games
+
+# ===== Microsoft Learn (C# fundamentals) =====
+https://learn.microsoft.com/en-us/dotnet/csharp/programming-guide/concepts/async/
+https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/operators/equality-comparisons
+
+# ===== Catlike Coding (advanced URP / shader / math) =====
+# https://catlikecoding.com/unity/tutorials/custom-srp/
+# (yazara saygı için: kişisel kullanım için indir, paylaşma)
+
+# ===== GitHub READMEs =====
+https://github.com/Cysharp/UniTask/blob/master/README.md
+https://github.com/dbrizov/NaughtyAttributes/blob/master/README.md
+https://github.com/quill18/MasterRefactorProject/blob/master/README.md
+
+# ===== Unity GitHub Open Projects =====
+https://github.com/UnityTechnologies/open-project-1/blob/main/README.md
+https://github.com/Unity-Technologies/com.unity.demoteam.hair/blob/main/README.md
+
+# ===== Steamworks public guides =====
+# (zaten tools/ingest/steamworks.py ile çekiliyor — buraya tekrar yazmana gerek yok)
+
+# ===== Kendi notların ve eski projelerin =====
+# Knowledge'e manuel olarak ekle (bkz: docs/INGEST.md "Manuel Doc Ekleme")

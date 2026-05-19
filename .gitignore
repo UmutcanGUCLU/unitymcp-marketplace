@@ -1,0 +1,45 @@
+# Knowledge base — büyük, kullanıcı başına ingest edilir, redistribute edilmez
+knowledge/
+
+# Index dosyaları — derive edilebilir
+.index/
+*.pkl
+*.bm25
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg
+
+# Qdrant volumes (Docker)
+docker/qdrant_data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Articles — kullanıcı özel URL listesi (paylaşmak istemeyebilir)
+articles.txt
+my-articles.txt
+
+# Test scratch
+/tmp/
+/_scratch/
+
+# Build artifacts (yokluk için, ileri proofing)
+dist/
+build/

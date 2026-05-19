@@ -1,0 +1,23 @@
+{
+  "name": "unitymcp",
+  "version": "0.2.0",
+  "description": "Full-stack Unity 6 (URP) uzmani - gameplay, editor tools, shaders, rendering, performance, UI, save sistemleri ve profesyonel workflow. v0.2: Knowledge base + doc-search MCP (BM25 + vector).",
+  "author": {
+    "name": "GarroshCan",
+    "email": "umutcanguclu38@gmail.com"
+  },
+  "keywords": [
+    "unity",
+    "unity6",
+    "urp",
+    "csharp",
+    "gamedev",
+    "shaders",
+    "performance",
+    "editor-tools",
+    "knowledge-base",
+    "rag"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/GarroshCan/unitymcp-marketplace"
+}

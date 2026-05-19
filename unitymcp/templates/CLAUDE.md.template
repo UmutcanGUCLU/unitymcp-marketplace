@@ -1,0 +1,126 @@
+# <PROJE_ADI> — Claude için Proje Rehberi
+
+> Bu dosya her Unity projenin kökünde (`Assets/` ile aynı seviyede) bulunmalı.
+> Claude burayı her oturum başında okur — projenin "kuralları" buraya yazılır.
+> `unitymcp` plugin'i Unity genel bilgisini sağlar; bu dosya bu **spesifik projenin** kurallarını.
+
+## Proje Özeti
+
+- **Tür**: <ör. Tycoon / Yönetim, 3D PC>
+- **Genre**: <ör. Üretim/lojistik sim>
+- **Hedef Platform**: <Windows + Steam, ileride Mac/Linux>
+- **Unity Sürümü**: 6000.0.30f1 (Unity 6 LTS)
+- **Render Pipeline**: URP
+- **Çıkış Hedefi**: <ör. 2027 Q2 EA, 2027 Q4 1.0>
+
+## Tech Stack
+
+- **Input**: New Input System (com.unity.inputsystem)
+- **DI / Service Locator**: <ör. VContainer veya yok / kendi locator'ım>
+- **Async**: UniTask (com.cysharp.unitask)
+- **Save**: Newtonsoft.Json + custom SaveContainer (versioning ile)
+- **UI**: <uGUI ana HUD için, UI Toolkit menüler için>
+- **Localization**: com.unity.localization (TR, EN)
+- **DOTween / iTween / vb.**: <varsa>
+- **Steam SDK**: Facepunch.Steamworks
+
+## Klasör Yapısı
+
+```
+Assets/
+  _Project/
+    Art/...
+    Audio/...
+    Code/
+      Core/          (Game.Core asmdef — base, no Unity refs ideal)
+      Data/          (Game.Data — SO'lar)
+      Gameplay/      (Game.Gameplay — refs Core, Data)
+      UI/            (Game.UI)
+      Editor/        (Game.Editor)
+    Data/            (ScriptableObject asset'ler)
+    Prefabs/
+    Scenes/
+    Settings/
+
+  Plugins/           (3rd party)
+```
+
+## Coding Convention
+
+- C# 10+, Unity 6 LTS
+- **Naming**:
+  - `PascalCase` class/struct/method
+  - `camelCase` local/param
+  - `_camelCase` private field (`private int _hp`)
+  - `kPrefix` for `const` (opsiyonel)
+- **Property** Inspector'da görünmesi gerekmiyorsa `public T Foo { get; private set; }`
+- **`[SerializeField] private`** Inspector'da görünmesi gerekirse, public field değil
+- **Magic number yok** — `const`, `static readonly`, veya SO field
+- **Method uzunluğu** 50 satırı geçerse refactor düşün
+- **`Debug.Log`**: production build'de strip et — `#if DEBUG` ya da `Conditional` attribute
+
+## Mimari Kurallar
+
+- **Direct cross-system reference yasak** — event channel veya interface üzerinden geç
+- **Singleton**: sadece gerçekten global olan için (GameManager, AudioManager). Diğer her şey ScriptableObject veya service locator
+- **Event channel preferred** — UnityEvent yerine ScriptableObject event channel
+- **No Resources.Load** — Addressables kullan
+- **No GameObject.Find / FindObjectOfType** — Awake'de inject veya cached locator
+
+## Performance Kuralları
+
+- Hot path'te `0 byte alloc` hedefi
+- `Animator.SetTrigger` her zaman hash ile: `Animator.StringToHash("Jump")`
+- `GetComponent` cache (Awake'de)
+- LINQ yalnızca soğuk path veya editor scripting
+- 1000+ objeyi enumerate etme — runtime set + observer pattern
+
+## Save Sistemi
+
+- Path: `Path.Combine(Application.persistentDataPath, "saves", "save_<slot>.json")`
+- Format: Newtonsoft JSON, `SaveContainer { version, payload, checksum }`
+- Atomic write (`.tmp` → rename, `.bak` backup)
+- Migration zinciri: V1 → V2 → V3, ileriye dönük destek
+- Async (UniTask thread pool)
+
+## URP / Rendering
+
+- Tek URP Asset, quality level'lar arasında shared
+- Renderer Feature listesi: <Outline / Decal / Custom>
+- Volume Profile per area
+- Shadow distance: 50m (PC default)
+- Tüm custom shader'lar SRP Batcher uyumlu
+
+## Build Pipeline
+
+- `Tools > Build > <command>` menüsünden tetiklenir
+- CI: GitHub Actions, game-ci/unity-builder
+- Versioning: semver, `Application.version` derive
+- Steam upload: `steamcmd` script
+
+## Test Stratejisi
+
+- **EditMode**: Saf C# unit test (Game.Core, Game.Data)
+- **PlayMode**: Sahne içi entegrasyon (movement, save/load round-trip)
+- **Manual QA**: Steam release öncesi tam playthrough
+
+## Çalışma Stili — Claude için
+
+- **Türkçe-İngilizce karışık**: Identifier'lar İngilizce, yorumlar Türkçe, açıklamalar Türkçe
+- **Production tuzaklarını her zaman belirt** — "bu çalışır" yetmez, "ama X durumunda Y olur"
+- **Bir seferde bir şey değiştir** — büyük refactor önerme; iteratif
+- **Trade-off göster** — hızlı yol vs doğru yol vs en doğru yol
+- **Mevcut kod tabanına saygı göster** — convention'a uy, yeniden icat etme
+
+## Aktif TODO Konuları (Claude bunlar üzerinde çalışıyor olabilir)
+
+<bu listeyi kendi current sprint'ine göre güncelle>
+
+- [ ] Inventory sistemini SO event channel'a port et
+- [ ] Save migration V1 → V2 yaz (eski beta save'leri uyumlu yap)
+- [ ] Toon shader outline'ı Renderer Feature'a taşı
+
+## Bilinen Sorunlar / Hatırlatmalar
+
+- Addressables `Release` her zaman scope sonu — leak test edilecek
+- Mobile build'i henüz hedef değil, ama API choice'lar mobile-friendly olsun (UniTask, hash, vb.)

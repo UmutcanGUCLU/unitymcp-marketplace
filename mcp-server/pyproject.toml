@@ -1,0 +1,27 @@
+[project]
+name = "unitymcp-doc-search"
+version = "0.2.0"
+description = "MCP server: Unity knowledge base hybrid search (BM25 + Qdrant)"
+authors = [{ name = "GarroshCan", email = "umutcanguclu38@gmail.com" }]
+requires-python = ">=3.10"
+dependencies = [
+  "mcp>=1.0.0",
+  "rank-bm25>=0.2.2",
+  "python-frontmatter>=1.1",
+]
+
+[project.optional-dependencies]
+vector = [
+  "fastembed>=0.3.4",
+  "qdrant-client>=1.10",
+]
+
+[project.scripts]
+unitymcp-doc-search = "doc_search.server:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["doc_search*"]
