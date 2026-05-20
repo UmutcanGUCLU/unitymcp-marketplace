@@ -2,7 +2,12 @@
 Unity package documentation indirici.
 
 URP, HDRP, Input System, Cinemachine, vb. paketlerin docs.unity3d.com'daki
-sürüm-spesifik dokümantasyonunu çeker.
+dokümantasyonunu çeker.
+
+Strateji:
+1. Once docdata/index.json (Unity'nin internal TOC) dene
+2. Sonra index.html link scraping fallback
+3. Rate-limit dostu: 2 concurrent, 0.4s delay, 429 retry-after
 
 Kullanım:
     python -m tools.ingest.package_docs --out knowledge/packages
@@ -22,70 +27,114 @@ from bs4 import BeautifulSoup
 from markdownify import markdownify as md
 from tqdm.asyncio import tqdm_asyncio
 
-# Unity 6 LTS için tipik paket sürümleri (kullanıcı override edebilir)
+# "latest" daha guvenli - Unity son surume yonlendirir
 DEFAULT_PACKAGES = {
-    "com.unity.render-pipelines.universal": "17.0",
-    "com.unity.render-pipelines.high-definition": "17.0",
-    "com.unity.inputsystem": "1.11",
-    "com.unity.cinemachine": "3.1",
-    "com.unity.addressables": "2.2",
-    "com.unity.localization": "1.5",
-    "com.unity.animation.rigging": "1.3",
-    "com.unity.ai.navigation": "2.0",
-    "com.unity.entities": "1.3",  # DOTS
-    "com.unity.netcode.gameobjects": "2.0",
+    "com.unity.render-pipelines.universal": "latest",
+    "com.unity.render-pipelines.high-definition": "latest",
+    "com.unity.inputsystem": "latest",
+    "com.unity.cinemachine": "latest",
+    "com.unity.addressables": "latest",
+    "com.unity.localization": "latest",
+    "com.unity.animation.rigging": "latest",
+    "com.unity.ai.navigation": "latest",
+    "com.unity.entities": "latest",
+    "com.unity.netcode.gameobjects": "latest",
 }
 
-USER_AGENT = "unitymcp-knowledge-ingestor/0.2"
-CONCURRENT = 4
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+CONCURRENT = 2
 TIMEOUT = 30
+RETRY_COUNT = 5
+DELAY = 0.4
 
 
 async def fetch(client: httpx.AsyncClient, url: str) -> str | None:
-    try:
-        r = await client.get(url, timeout=TIMEOUT)
-        return r.text if r.status_code == 200 else None
-    except httpx.RequestError as e:
-        print(f"  ! {url}: {e}", file=sys.stderr)
-        return None
+    last_status = None
+    for attempt in range(RETRY_COUNT):
+        try:
+            r = await client.get(url, timeout=TIMEOUT)
+            last_status = r.status_code
+            if r.status_code == 200:
+                return r.text
+            if r.status_code in (404, 410):
+                return None
+            if r.status_code == 429:
+                retry_after = r.headers.get("Retry-After")
+                wait = int(retry_after) if retry_after and retry_after.isdigit() else min(60, 2 ** (attempt + 3))
+                await asyncio.sleep(wait)
+                continue
+        except (httpx.RequestError, httpx.TimeoutException) as e:
+            if attempt == RETRY_COUNT - 1:
+                print(f"  ! Network: {url.split('/')[-1]}: {e}", file=sys.stderr)
+                return None
+        await asyncio.sleep(2 ** attempt)
+    if last_status and last_status != 404:
+        print(f"  ! HTTP {last_status}: {url.split('/')[-1]}", file=sys.stderr)
+    return None
 
 
-def html_to_md(html: str, source: str) -> str:
+def html_to_md(html: str, source: str) -> tuple[str, str]:
     soup = BeautifulSoup(html, "lxml")
-    main = soup.find("article") or soup.find("div", id="content_wrap") or soup.body
-    if main is None:
-        return ""
-    # Cleanup
-    for tag in main.select("nav, .breadcrumbs, .footer, .search"):
-        tag.decompose()
     title = "Untitled"
-    h1 = main.find("h1")
+    h1 = soup.find("h1")
     if h1:
         title = h1.get_text(strip=True)
-    body = md(str(main), heading_style="ATX", bullets="-")
-    body = re.sub(r"\n{3,}", "\n\n", body).strip()
-    return f"""---
-title: "{title.replace('"', "'")}"
-source: "{source}"
----
+    elif soup.title:
+        title = soup.title.get_text(strip=True)
 
-{body}
-"""
+    container = (
+        soup.select_one("article") or
+        soup.select_one("main") or
+        soup.select_one("#content-wrap .section") or
+        soup.select_one("#content-wrap") or
+        soup.select_one(".content") or
+        soup.body
+    )
+    if container is None:
+        return title, ""
+
+    for sel in ["nav", "header", "footer", "aside", ".sidebar", ".breadcrumbs",
+                "script", "style", "noscript", ".search", ".version-picker",
+                ".language-picker", ".lang-list"]:
+        for tag in container.select(sel):
+            tag.decompose()
+
+    body_md = md(str(container), heading_style="ATX", bullets="-", strip=["link", "meta"])
+    body_md = re.sub(r"\n{3,}", "\n\n", body_md).strip()
+    return title, body_md
 
 
-async def get_package_pages(client: httpx.AsyncClient, base: str) -> list[str]:
-    """Paket TOC'unu bul ve tüm sayfaları listele."""
-    # Unity package docs format: docs.unity3d.com/Packages/<pkg>@<version>/manual/<page>.html
-    index_url = f"{base}/manual/index.html"
-    html = await fetch(client, index_url)
+async def get_pages_for_package(client: httpx.AsyncClient, base: str) -> list[str]:
+    # Strategy 1: docdata/index.json
+    index_url = f"{base}/manual/docdata/index.json"
+    try:
+        r = await client.get(index_url, timeout=TIMEOUT)
+        if r.status_code == 200:
+            data = r.json()
+            if isinstance(data, dict) and "pages" in data:
+                pages = []
+                for entry in data["pages"]:
+                    if isinstance(entry, list) and len(entry) >= 1:
+                        slug = entry[0]
+                        pages.append(f"{base}/manual/{slug}.html")
+                if pages:
+                    return pages
+    except Exception:
+        pass
+
+    # Strategy 2: index.html link scraping fallback
+    html = await fetch(client, f"{base}/manual/index.html")
     if not html:
         return []
     soup = BeautifulSoup(html, "lxml")
     pages = set()
+    pages.add(f"{base}/manual/index.html")
     for a in soup.find_all("a", href=True):
         href = a["href"]
-        if href.endswith(".html") and not href.startswith(("http://", "https://")):
-            pages.add(urljoin(index_url, href))
+        if href.endswith(".html") and not href.startswith(("http://", "https://", "mailto:", "#")):
+            full = urljoin(f"{base}/manual/index.html", href.split("#")[0])
+            if base in full:
+                pages.add(full)
     return sorted(pages)
 
 
@@ -94,12 +143,12 @@ def safe_filename(url: str) -> str:
     return re.sub(r"[^a-zA-Z0-9._-]", "_", name) + ".md"
 
 
-async def process_package(client, pkg: str, version: str, out_root: Path) -> None:
+async def process_package(client, pkg: str, version: str, out_root: Path, resume: bool) -> None:
     base = f"https://docs.unity3d.com/Packages/{pkg}@{version}"
     print(f"\n=== {pkg}@{version} ===")
-    pages = await get_package_pages(client, base)
+    pages = await get_pages_for_package(client, base)
     if not pages:
-        print(f"  ! {pkg}: sayfa bulunamadı, URL/sürüm kontrol et: {base}")
+        print(f"  ! sayfa bulunamadi: {base}")
         return
     print(f"  {len(pages)} sayfa")
 
@@ -109,18 +158,32 @@ async def process_package(client, pkg: str, version: str, out_root: Path) -> Non
     sem = asyncio.Semaphore(CONCURRENT)
 
     async def fetch_one(url: str) -> bool:
+        filename = safe_filename(url)
+        out_path = pkg_dir / filename
+        if resume and out_path.exists() and out_path.stat().st_size > 200:
+            return False
         async with sem:
+            await asyncio.sleep(DELAY)
             html = await fetch(client, url)
             if not html:
                 return False
-            content = html_to_md(html, url)
-            if not content.strip():
+            title, body_md = html_to_md(html, url)
+            if not body_md.strip():
                 return False
-            (pkg_dir / safe_filename(url)).write_text(content, encoding="utf-8")
+            content = f"""---
+title: "{title.replace('"', "'")}"
+source: "{url}"
+section: "packages/{pkg}"
+---
+
+{body_md}
+"""
+            out_path.write_text(content, encoding="utf-8")
             return True
 
     results = await tqdm_asyncio.gather(*[fetch_one(u) for u in pages], desc=f"  {pkg}")
-    print(f"  ✓ {sum(results)} yazıldı")
+    written = sum(1 for r in results if r)
+    print(f"  v {written} yazildi")
 
 
 async def main_async(args):
@@ -128,22 +191,22 @@ async def main_async(args):
     out_root.mkdir(parents=True, exist_ok=True)
 
     if args.packages:
-        # Custom liste; sürümleri default'tan al, yoksa "latest"
         pkgs = {p: DEFAULT_PACKAGES.get(p, "latest") for p in args.packages}
     else:
         pkgs = DEFAULT_PACKAGES
 
     async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT}, follow_redirects=True) as client:
         for pkg, version in pkgs.items():
-            await process_package(client, pkg, version, out_root)
+            await process_package(client, pkg, version, out_root, resume=args.resume)
 
-    print(f"\nTamamlandı. Çıktı: {out_root.resolve()}")
+    print(f"\nTamamlandi. Cikti: {out_root.resolve()}")
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default="knowledge/packages")
-    parser.add_argument("--packages", nargs="*", help="Spesifik paketler (default: tüm liste)")
+    parser.add_argument("--packages", nargs="*", help="Spesifik paketler (default: tum liste)")
+    parser.add_argument("--resume", action="store_true", help="Var olan dosyalari atla")
     args = parser.parse_args()
     asyncio.run(main_async(args))
 

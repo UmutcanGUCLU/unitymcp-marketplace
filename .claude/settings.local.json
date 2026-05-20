@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__unity-docs__knowledge_status",
+      "mcp__unity-docs__search_unity_docs",
+      "mcp__unity-docs__read_doc"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "unity-docs"
+  ]
+}

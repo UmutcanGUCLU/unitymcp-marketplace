@@ -43,3 +43,15 @@ my-articles.txt
 # Build artifacts (yokluk için, ileri proofing)
 dist/
 build/
+
+# Local project-level MCP config (sadece root'taki — pluginiçindeki commit edilsin)
+/.mcp.json
+
+# Personal cache / sample dosyalari
+sample.html
+sr_index.html
+sr_data.json
+pkg_list.html
+manual_data.json
+sr_toc.json
+sample.json
